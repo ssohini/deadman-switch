@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deadman Switch Protocol</title>
+  <meta name="description" content="A premium secure-themed Deadman Switch simulator. Set a safety timer, input a receiver address, and check in regularly to prevent system triggering.">
+  <!-- Google Fonts for futuristic/security terminal theme -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Orbitron:wght@400;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <!-- FontAwesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="glow-bg"></div>
+  <main class="app-container">
+    <header class="app-header">
+      <div class="logo-area">
+        <i class="fa-solid fa-triangle-exclamation warning-icon pulse"></i>
+        <h1>SECURE SWITCH PROTOCOL</h1>
+      </div>
+      <div class="protocol-id" id="protocol-id-display">PROTOCOL-ID: UNASSIGNED</div>
+    </header>
+
+    <div class="dashboard-grid">
+      <!-- Left Panel: Controls & Inputs -->
+      <section class="panel control-panel" id="sec-controls">
+        <div class="panel-header">
+          <i class="fa-solid fa-sliders"></i>
+          <h2>Configuration</h2>
+        </div>
+        
+        <form id="switch-config-form" onsubmit="return false;">
+          <div class="input-group">
+            <label for="timer-input">
+              <i class="fa-solid fa-stopwatch"></i> Timer Duration (Seconds)
+            </label>
+            <input 
+              type="number" 
+              id="timer-input" 
+              min="2" 
+              placeholder="e.g. 30" 
+              required
+            >
+            <span class="input-hint">Amount of time before switch triggers without check-in.</span>
+          </div>
+
+          <div class="input-group">
+            <label for="receiver-input">
+              <i class="fa-solid fa-envelope"></i> Receiver Address / Payload Destination
+            </label>
+            <input 
+              type="text" 
+              id="receiver-input" 
+              placeholder="e.g. agent.backup@secure-mail.net" 
+              required
+            >
+            <span class="input-hint">Where the payload/alert will be sent if switch is triggered.</span>
+          </div>
+
+          <div class="input-group">
+            <label for="connect-wallet-btn">
+              <i class="fa-solid fa-wallet"></i> Stellar Wallet (Freighter)
+            </label>
+            <button type="button" id="connect-wallet-btn" class="btn btn-secondary">
+              <i class="fa-solid fa-plug"></i> Connect Freighter Wallet
+            </button>
+            <div id="wallet-status" class="wallet-status">NOT CONNECTED</div>
+            <span class="input-hint">Required to send XLM on trigger. Receiver must be a Stellar G... address.</span>
+          </div>
+
+          <div class="button-stack">
+            <button type="submit" id="activate-btn" class="btn btn-primary">
+              <i class="fa-solid fa-radiation"></i> Activate Deadman Switch
+            </button>
+            
+            <button type="button" id="alive-btn" class="btn btn-success btn-disabled" disabled>
+              <i class="fa-solid fa-heartbeat"></i> I'm Alive (Check-In)
+            </button>
+            
+            <button type="button" id="check-btn" class="btn btn-secondary">
+              <i class="fa-solid fa-shield-halved"></i> Check Status
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Right Panel: Status display & Countdown -->
+      <section class="panel status-panel" id="sec-status">
+        <div class="panel-header">
+          <i class="fa-solid fa-circle-info"></i>
+          <h2>System Monitor</h2>
+        </div>
+
+        <div class="monitor-display">
+          <div class="status-badge-container">
+            <span class="badge-label">PROTOCOL STATUS</span>
+            <div id="status-display" class="status-badge state-inactive">INACTIVE</div>
+          </div>
+
+          <!-- Countdown Visualizer -->
+          <div class="countdown-container">
+            <svg class="progress-ring" width="200" height="200">
+              <circle class="progress-ring-circle-bg" stroke="rgba(255,255,255,0.05)" stroke-width="8" fill="transparent" r="85" cx="100" cy="100" />
+              <circle id="progress-bar" class="progress-ring-circle" stroke="var(--accent-dim)" stroke-width="8" fill="transparent" r="85" cx="100" cy="100" />
+            </svg>
+            <div class="countdown-text">
+              <span id="countdown-number" class="countdown-time">--</span>
+              <span class="countdown-unit">SECONDS REMAINING</span>
+            </div>
+          </div>
+
+          <div class="meta-info">
+            <div class="meta-row">
+              <span class="meta-label">LAST CHECK-IN:</span>
+              <span id="last-checkin-display" class="meta-value">NEVER</span>
+            </div>
+            <div class="meta-row">
+              <span class="meta-label">NEXT EXPECTED:</span>
+              <span id="next-checkin-display" class="meta-value">N/A</span>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Logs panel -->
+    <section class="panel console-panel" id="sec-logs">
+      <div class="panel-header">
+        <i class="fa-solid fa-terminal"></i>
+        <h2>System Logs & Audit Trail</h2>
+        <button id="clear-logs-btn" class="btn-text"><i class="fa-solid fa-trash-can"></i> Clear</button>
+      </div>
+      <div class="console-body" id="console-logs">
+        <div class="log-line system">[SYSTEM INITIALIZED] Standing by for configuration...</div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="app-footer">
+    <p>SECURE TERMINAL CONNECTION // LOCAL SIMULATOR // AES-256 EMULATED</p>
+  </footer>
+
+  <!-- Freighter API UMD bundle (exposes window.freighterApi) -->
+  <script src="https://cdn.jsdelivr.net/npm/@stellar/freighter-api@6.0.1/build/index.min.js"></script>
+  <!-- Stellar SDK v16 UMD bundle (exposes window.StellarSdk) -->
+  <script src="https://cdn.jsdelivr.net/npm/@stellar/stellar-sdk@16.0.1/dist/stellar-sdk.min.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
