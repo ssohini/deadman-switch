@@ -292,6 +292,18 @@ body {
   box-shadow: none !important;
 }
 
+.btn-loading {
+  opacity: 0.75;
+  cursor: wait;
+  pointer-events: none;
+  animation: btn-pulse 1s ease-in-out infinite;
+}
+
+@keyframes btn-pulse {
+  0%, 100% { opacity: 0.75; }
+  50%       { opacity: 0.4; }
+}
+
 .btn-text {
   background: none;
   border: none;

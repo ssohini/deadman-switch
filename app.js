@@ -51,6 +51,10 @@ let state = {
 let walletPublicKey = null;
 let triggerInProgress = false;
 
+// Event streaming state
+let lastEventLedger = 0;     // track the highest ledger we've seen events for
+let eventPollInterval = null; // handle for the event polling setInterval
+
 // ─── DOM Elements ─────────────────────────────────────────────────────────────
 const timerInput          = document.getElementById("timer-input");
 const receiverInput       = document.getElementById("receiver-input");
@@ -257,6 +261,27 @@ function decodeTransactionResult(resultXdr) {
   }
 }
 
+// ─── Loading Spinner Helpers ──────────────────────────────────────────────────
+
+/**
+ * Show a spinner inside a button while an async action runs.
+ * Restores the original label + disabled state when the promise settles.
+ */
+async function withButtonSpinner(btn, label, asyncFn) {
+  const originalText     = btn.textContent;
+  const originalDisabled = btn.disabled;
+  btn.disabled    = true;
+  btn.textContent = `⏳ ${label}…`;
+  btn.classList.add("btn-loading");
+  try {
+    return await asyncFn();
+  } finally {
+    btn.textContent = originalText;
+    btn.disabled    = originalDisabled;
+    btn.classList.remove("btn-loading");
+  }
+}
+
 // ─── Soroban RPC Helpers ──────────────────────────────────────────────────────
 
 /** Get a configured rpc.Server instance */
@@ -389,6 +414,108 @@ async function readContractState(ownerAddress) {
   }
 }
 
+// ─── On-Chain Event Streaming ─────────────────────────────────────────────────
+
+/**
+ * Fetch recent contract events from Soroban RPC and append them to the system
+ * log. Uses a ledger cursor so we don't re-display the same events twice.
+ * Events emitted by the deadman-switch contract: init, reset, deposit, chk_in, trigger
+ */
+async function pollContractEvents() {
+  try {
+    const server = getRpcServer();
+
+    // getLatestLedger gives us the current ledger sequence number
+    const latestLedger = await server.getLatestLedger();
+    const latestSeq    = Number(latestLedger.sequence);
+
+    // We only look at the last 100 ledgers (~8 minutes on Testnet)
+    // and only events we haven't seen yet (ledger > lastEventLedger)
+    const startLedger = Math.max(1, lastEventLedger + 1);
+    if (startLedger > latestSeq) return;     // nothing new
+
+    const response = await server.getEvents({
+      startLedger,
+      filters: [
+        {
+          type:        "contract",
+          contractIds: [CONTRACT_ID],
+        },
+      ],
+      limit: 50,
+    });
+
+    if (!response || !response.events || response.events.length === 0) {
+      // Update cursor so we don't re-scan old ledgers next cycle
+      lastEventLedger = latestSeq;
+      return;
+    }
+
+    // Sort events by ledger sequence (oldest first)
+    const sorted = [...response.events].sort((a, b) => Number(a.ledger) - Number(b.ledger));
+
+    for (const ev of sorted) {
+      const ledger = Number(ev.ledger);
+      if (ledger <= lastEventLedger) continue;
+
+      // Decode event topic (first element = symbol_short name)
+      let topic = "unknown";
+      try {
+        if (ev.topic && ev.topic.length > 0) {
+          topic = scValToNative(ev.topic[0]);
+        }
+      } catch (_) {}
+
+      // Map short event names to readable labels
+      const eventLabels = {
+        init:    "🟢 SWITCH INITIALIZED",
+        reset:   "🔄 SWITCH RESET",
+        deposit: "💰 DEPOSIT RECEIVED",
+        chk_in:  "💓 HEARTBEAT CHECK-IN",
+        trigger: "🚨 EMERGENCY TRIGGERED",
+      };
+      const label = eventLabels[topic] || `📡 EVENT: ${topic}`;
+
+      // Decode event value for extra details
+      let detail = "";
+      try {
+        if (ev.value) {
+          const val = scValToNative(ev.value);
+          if (val !== null && val !== undefined) {
+            detail = ` | data: ${JSON.stringify(val, (_, v) => typeof v === "bigint" ? v.toString() : v)}`;
+          }
+        }
+      } catch (_) {}
+
+      appendLog(`${label} [ledger: ${ledger}]${detail}`, topic === "trigger" ? "danger" : "success");
+      lastEventLedger = Math.max(lastEventLedger, ledger);
+    }
+
+    // Advance cursor even if no events, so we don't re-scan on next tick
+    lastEventLedger = Math.max(lastEventLedger, latestSeq);
+
+  } catch (e) {
+    // Silently ignore network errors in event polling (non-critical)
+    console.warn("Event polling error:", e.message);
+  }
+}
+
+/** Start polling contract events every 10 seconds */
+function startEventPolling() {
+  if (eventPollInterval) return;            // already running
+  eventPollInterval = setInterval(pollContractEvents, 10_000);
+  // Also fire immediately to catch any recent events
+  pollContractEvents();
+}
+
+/** Stop event polling (e.g. when switch is triggered) */
+function stopEventPolling() {
+  if (eventPollInterval) {
+    clearInterval(eventPollInterval);
+    eventPollInterval = null;
+  }
+}
+
 // ─── Wallet Connection ────────────────────────────────────────────────────────
 async function connectWallet() {
   console.log("Connecting wallet...");
@@ -471,6 +598,7 @@ async function syncChainState() {
 
     if (state.status === "ACTIVE") {
       startInterval();
+      startEventPolling();
       appendLog(`✅ On-chain switch loaded — ACTIVE. Timeout: ${timeoutSecs}s`, "success");
     } else {
       appendLog("⚠️ On-chain switch is TRIGGERED or EXPIRED.", "warning");
@@ -561,6 +689,7 @@ async function activateSwitch() {
 
     updateUI();
     startInterval();
+    startEventPolling();
 
   } catch (e) {
     appendLog(`❌ Activation failed: ${parseSorobanError(e)}`, "danger");
@@ -705,10 +834,14 @@ async function triggerEmergency() {
     state.status = "TRIGGERED";
     saveState();
     clearInterval(updateInterval); // Stop polling after successful trigger
+    stopEventPolling();            // Stop event streaming
 
     playSound("triggered");
     appendLog("🚨 EMERGENCY TRIGGER EXECUTED ON-CHAIN!", "danger");
     appendLog(`📨 Funds released to: ${state.receiverAddress}`, "danger");
+
+    // Fire one final event poll to capture the trigger event on-chain
+    setTimeout(pollContractEvents, 3000);
 
   } catch (e) {
     appendLog(`❌ Trigger failed: ${parseSorobanError(e)}`, "danger");

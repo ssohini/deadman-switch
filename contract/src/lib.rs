@@ -1,5 +1,5 @@
 #![no_std]
-use soroban_sdk::{contract, contracterror, contractimpl, contracttype, token, Address, Env};
+use soroban_sdk::{contract, contracterror, contractimpl, contracttype, symbol_short, token, Address, Env};
 
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -61,15 +61,23 @@ impl DeadmanSwitchContract {
             }
         }
 
+        let now = env.ledger().timestamp();
         let state = SwitchState {
-            beneficiary,
+            beneficiary: beneficiary.clone(),
             timeout,
-            last_check_in: env.ledger().timestamp(),
+            last_check_in: now,
             active: true,
             balance: 0,
         };
 
         env.storage().persistent().set(&key, &state);
+
+        // Emit on-chain event for switch initialization
+        env.events().publish(
+            (symbol_short!("init"), owner),
+            (beneficiary, timeout, now)
+        );
+
         Ok(())
     }
 
@@ -86,6 +94,10 @@ impl DeadmanSwitchContract {
 
         state.active = false;
         env.storage().persistent().set(&key, &state);
+
+        // Emit on-chain event for resetting the switch
+        env.events().publish((symbol_short!("reset"), owner), ());
+
         Ok(())
     }
 
@@ -113,6 +125,10 @@ impl DeadmanSwitchContract {
 
         state.balance += amount;
         env.storage().persistent().set(&key, &state);
+
+        // Emit on-chain event for asset deposit
+        env.events().publish((symbol_short!("deposit"), owner), amount);
+
         Ok(())
     }
 
@@ -131,8 +147,13 @@ impl DeadmanSwitchContract {
             return Err(Error::NotActive);
         }
 
-        state.last_check_in = env.ledger().timestamp();
+        let now = env.ledger().timestamp();
+        state.last_check_in = now;
         env.storage().persistent().set(&key, &state);
+
+        // Emit on-chain event for heartbeat check-in
+        env.events().publish((symbol_short!("chk_in"), owner), now);
+
         Ok(())
     }
 
@@ -173,19 +194,27 @@ impl DeadmanSwitchContract {
 
         // Mark as triggered
         state.active = false;
+        let final_balance = state.balance;
 
         // Release funds to beneficiary if balance > 0
-        if state.balance > 0 {
+        if final_balance > 0 {
             let token_client = token::Client::new(&env, &token);
             let contract_balance = token_client.balance(&env.current_contract_address());
-            if contract_balance < state.balance {
+            if contract_balance < final_balance {
                 return Err(Error::InsufficientContractBalance);
             }
-            token_client.transfer(&env.current_contract_address(), &state.beneficiary, &state.balance);
+            token_client.transfer(&env.current_contract_address(), &state.beneficiary, &final_balance);
             state.balance = 0;
         }
 
         env.storage().persistent().set(&key, &state);
+
+        // Emit on-chain event for emergency trigger
+        env.events().publish(
+            (symbol_short!("trigger"), owner),
+            (state.beneficiary.clone(), final_balance)
+        );
+
         Ok(())
     }
 
@@ -195,3 +224,6 @@ impl DeadmanSwitchContract {
         env.storage().persistent().get(&key)
     }
 }
+
+#[cfg(test)]
+mod test;
