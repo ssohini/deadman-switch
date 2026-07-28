@@ -4,7 +4,8 @@
   "description": "A premium secure-themed Deadman Switch web application simulator.",
   "main": "index.html",
   "scripts": {
-    "dev": "npx http-server -p 3000"
+    "dev": "npx http-server -p 3000",
+    "test": "node tests/frontend.test.js"
   },
   "keywords": [
     "deadman",

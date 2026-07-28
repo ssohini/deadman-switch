@@ -145,6 +145,50 @@ body {
   .protocol-id {
     align-self: flex-start;
   }
+  
+  .countdown-container, .progress-ring {
+    width: 160px;
+    height: 160px;
+  }
+  
+  .countdown-time {
+    font-size: 2.5rem;
+  }
+  
+  .console-body {
+    max-height: 200px;
+  }
+  
+  .button-stack .btn {
+    width: 100%;
+  }
+  
+  .meta-info .meta-row {
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .app-header h1 {
+    font-size: 1.1rem;
+  }
+  
+  .panel {
+    padding: 1rem;
+  }
+  
+  .countdown-container, .progress-ring {
+    width: 130px;
+    height: 130px;
+  }
+  
+  .input-group input {
+    font-size: 14px;
+  }
+  
+  .status-badge {
+    font-size: 0.8rem;
+  }
 }
 
 /* Glassmorphism Panel styles */

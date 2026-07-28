@@ -647,9 +647,9 @@ async function activateSwitch() {
   }
 
   appendLog("🔐 Initializing Deadman Switch on Stellar Testnet...", "info");
-  activateBtn.disabled = true;
 
-  try {
+  await withButtonSpinner(activateBtn, "Activating", async () => {
+    try {
     const ownerScVal       = Address.fromString(walletPublicKey).toScVal();
     const beneficiaryScVal = Address.fromString(receiver).toScVal();
     const timeoutScVal     = nativeToScVal(BigInt(duration), { type: "u64" });
@@ -691,11 +691,11 @@ async function activateSwitch() {
     startInterval();
     startEventPolling();
 
-  } catch (e) {
-    appendLog(`❌ Activation failed: ${parseSorobanError(e)}`, "danger");
-    console.error("activateSwitch error:", e);
-    activateBtn.disabled = false;
-  }
+    } catch (e) {
+      appendLog(`❌ Activation failed: ${parseSorobanError(e)}`, "danger");
+      console.error("activateSwitch error:", e);
+    }
+  });
 }
 
 // ─── Check-In ─────────────────────────────────────────────────────────────────
@@ -710,9 +710,9 @@ async function checkIn() {
   }
 
   appendLog("💓 Sending check-in heartbeat to blockchain...", "info");
-  aliveBtn.disabled = true;
 
-  try {
+  await withButtonSpinner(aliveBtn, "Signing", async () => {
+    try {
     const ownerScVal = Address.fromString(walletPublicKey).toScVal();
     const { preparedTx, server } = await buildContractTx("check_in", [ownerScVal]);
     await signAndSubmit(preparedTx, server);
@@ -736,12 +736,11 @@ async function checkIn() {
     appendLog(`✅ Check-in confirmed on-chain! Reset for another ${state.timerDuration}s.`, "success");
     updateUI();
 
-  } catch (e) {
-    appendLog(`❌ Check-in failed: ${parseSorobanError(e)}`, "danger");
-    console.error("checkIn error:", e);
-  } finally {
-    aliveBtn.disabled = (state.status !== "ACTIVE");
-  }
+    } catch (e) {
+      appendLog(`❌ Check-in failed: ${parseSorobanError(e)}`, "danger");
+      console.error("checkIn error:", e);
+    }
+  });
 }
 
 // ─── Check Status ─────────────────────────────────────────────────────────────
@@ -753,8 +752,9 @@ async function checkStatus() {
     return;
   }
 
-  try {
-    // Fetch current ledger timestamp FIRST for accurate diagnostics
+  await withButtonSpinner(checkBtn, "Checking", async () => {
+    try {
+      // Fetch current ledger timestamp FIRST for accurate diagnostics
     const currentLedgerTs = await getLedgerTimestamp();
     appendLog(`⏱️ Current ledger timestamp: ${currentLedgerTs}s (${new Date(currentLedgerTs * 1000).toUTCString()})`, "system");
 
@@ -801,10 +801,11 @@ async function checkStatus() {
       appendLog("🚨 Switch is EXPIRED or TRIGGERED on ledger.", "danger");
     }
 
-  } catch (e) {
-    appendLog(`❌ Status check failed: ${e.message}`, "danger");
-    console.error("checkStatus error:", e);
-  }
+    } catch (e) {
+      appendLog(`❌ Status check failed: ${e.message}`, "danger");
+      console.error("checkStatus error:", e);
+    }
+  });
 }
 
 // ─── Emergency Trigger ────────────────────────────────────────────────────────
