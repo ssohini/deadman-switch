@@ -287,6 +287,23 @@ async function withButtonSpinner(btn, label, asyncFn) {
   }
 }
 
+/**
+ * Wraps a promise with a timeout. If the promise does not settle within
+ * the specified milliseconds, the returned promise rejects with an error.
+ */
+function withTimeout(promise, ms, timeoutErrorMsg = "Operation timed out") {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(timeoutErrorMsg));
+    }, ms);
+
+    promise
+      .then(resolve)
+      .catch(reject)
+      .finally(() => clearTimeout(timer));
+  });
+}
+
 // ─── Soroban RPC Helpers ──────────────────────────────────────────────────────
 
 /** Get a configured rpc.Server instance */
@@ -300,7 +317,11 @@ function getRpcServer() {
  */
 async function buildContractTx(method, args) {
   const server  = getRpcServer();
-  const account = await server.getAccount(walletPublicKey);
+  const account = await withTimeout(
+    server.getAccount(walletPublicKey),
+    10000,
+    "Failed to fetch account from Stellar network. The RPC server might be slow or unresponsive."
+  );
 
   const contract   = new Contract(CONTRACT_ID);
   const operation  = contract.call(method, ...args);
@@ -314,7 +335,11 @@ async function buildContractTx(method, args) {
     .build();
 
   // prepareTransaction = simulate + inject footprint/auth in one call
-  const preparedTx = await server.prepareTransaction(builtTx);
+  const preparedTx = await withTimeout(
+    server.prepareTransaction(builtTx),
+    15000,
+    "Transaction simulation timed out. The Soroban RPC server might be slow or unresponsive."
+  );
   return { preparedTx, server };
 }
 
@@ -326,17 +351,30 @@ async function signAndSubmit(tx, server) {
   appendLog("✍️ Waiting for Freighter signature...", "info");
 
   const freighter = getFreighter();
-  const signResult = await freighter.signTransaction(tx.toXDR(), {
-    networkPassphrase: NETWORK_PASSPHRASE,
-  });
+  const signResult = await withTimeout(
+    freighter.signTransaction(tx.toXDR(), {
+      networkPassphrase: NETWORK_PASSPHRASE,
+      address: walletPublicKey,
+    }),
+    30000,
+    "Freighter signature request timed out. Make sure the extension is unlocked and same-origin popups are allowed."
+  );
 
-  const signedXdr = typeof signResult === "string" ? signResult : signResult.signedTxXdr;
+  if (signResult && signResult.error) {
+    throw new Error(`Freighter error: ${signResult.error}`);
+  }
+
+  const signedXdr = typeof signResult === "string" ? signResult : signResult?.signedTxXdr;
   if (!signedXdr) throw new Error("Freighter returned no signed XDR.");
 
   const signedTx = new Transaction(signedXdr, NETWORK_PASSPHRASE);
 
   appendLog("🚀 Submitting to Stellar Testnet...", "info");
-  const submitResult = await server.sendTransaction(signedTx);
+  const submitResult = await withTimeout(
+    server.sendTransaction(signedTx),
+    15000,
+    "Transaction submission timed out. The Stellar RPC server might be slow or unresponsive."
+  );
 
   if (submitResult.status === "ERROR") {
     let errorDetail = "";
@@ -379,8 +417,15 @@ async function readContractState(ownerAddress) {
 
   let account;
   try {
-    account = await server.getAccount(ownerAddress);
+    account = await withTimeout(
+      server.getAccount(ownerAddress),
+      10000,
+      "Failed to fetch account. The RPC server might be slow or unresponsive."
+    );
   } catch (e) {
+    if (e.message.includes("timed out") || e.message.includes("RPC server")) {
+      throw e;
+    }
     throw new Error("Account not found. Fund your Testnet wallet first: https://laboratory.stellar.org/#account-creator");
   }
 
@@ -396,7 +441,11 @@ async function readContractState(ownerAddress) {
     .setTimeout(30)
     .build();
 
-  const simResult = await server.simulateTransaction(tx);
+  const simResult = await withTimeout(
+    server.simulateTransaction(tx),
+    10000,
+    "Simulation timed out. The RPC server might be slow or unresponsive."
+  );
 
   if (rpc.Api.isSimulationError(simResult)) {
     // Contract panics when switch doesn't exist — treat as no switch
@@ -431,7 +480,11 @@ async function pollContractEvents() {
     const server = getRpcServer();
 
     // getLatestLedger gives us the current ledger sequence number
-    const latestLedger = await server.getLatestLedger();
+    const latestLedger = await withTimeout(
+      server.getLatestLedger(),
+      10000,
+      "Failed to fetch latest ledger for event polling."
+    );
     const latestSeq    = Number(latestLedger.sequence);
 
     // We only look at the last 100 ledgers (~8 minutes on Testnet)
@@ -439,16 +492,20 @@ async function pollContractEvents() {
     const startLedger = Math.max(1, lastEventLedger + 1);
     if (startLedger > latestSeq) return;     // nothing new
 
-    const response = await server.getEvents({
-      startLedger,
-      filters: [
-        {
-          type:        "contract",
-          contractIds: [CONTRACT_ID],
-        },
-      ],
-      limit: 50,
-    });
+    const response = await withTimeout(
+      server.getEvents({
+        startLedger,
+        filters: [
+          {
+            type:        "contract",
+            contractIds: [CONTRACT_ID],
+          },
+        ],
+        limit: 50,
+      }),
+      10000,
+      "Failed to fetch contract events."
+    );
 
     if (!response || !response.events || response.events.length === 0) {
       // Update cursor so we don't re-scan old ledgers next cycle
@@ -524,36 +581,50 @@ function stopEventPolling() {
 // ─── Wallet Connection ────────────────────────────────────────────────────────
 async function connectWallet() {
   console.log("Connecting wallet...");
-  try {
-    const freighter = getFreighter();
+  await withButtonSpinner(connectWalletBtn, "Connecting", async () => {
+    try {
+      const freighter = getFreighter();
 
-    // Check if extension is connected
-    const isConn   = await freighter.isConnected();
-    const connected = typeof isConn === "object" ? isConn.isConnected : isConn;
-    if (!connected) {
-      appendLog("❌ Freighter is not installed or not connected.", "danger");
-      return;
+      // Check if extension is connected
+      const isConn   = await withTimeout(
+        freighter.isConnected(),
+        10000,
+        "Freighter wallet connection request timed out."
+      );
+      const connected = typeof isConn === "object" ? isConn.isConnected : isConn;
+      if (!connected) {
+        appendLog("❌ Freighter is not installed or not connected.", "danger");
+        return;
+      }
+
+      await withTimeout(
+        freighter.requestAccess(),
+        30000,
+        "Freighter access request timed out. Make sure the extension is unlocked."
+      );
+
+      const addrResult = await withTimeout(
+        freighter.getAddress(),
+        10000,
+        "Failed to retrieve address from Freighter."
+      );
+      const address    = typeof addrResult === "object" ? addrResult.address : addrResult;
+      if (!address) throw new Error("No address returned from Freighter.");
+
+      walletPublicKey  = address;
+      state.publicKey  = address;
+      saveState();
+      updateWalletDisplay();
+      appendLog(`✅ Wallet connected: ${address}`, "success");
+
+      appendLog("🔍 Reading on-chain switch state...", "info");
+      await syncChainState();
+
+    } catch (e) {
+      appendLog(`❌ Wallet connection failed: ${e.message}`, "danger");
+      console.error("connectWallet error:", e);
     }
-
-    await freighter.requestAccess();
-
-    const addrResult = await freighter.getAddress();
-    const address    = typeof addrResult === "object" ? addrResult.address : addrResult;
-    if (!address) throw new Error("No address returned from Freighter.");
-
-    walletPublicKey  = address;
-    state.publicKey  = address;
-    saveState();
-    updateWalletDisplay();
-    appendLog(`✅ Wallet connected: ${address}`, "success");
-
-    appendLog("🔍 Reading on-chain switch state...", "info");
-    await syncChainState();
-
-  } catch (e) {
-    appendLog(`❌ Wallet connection failed: ${e.message}`, "danger");
-    console.error("connectWallet error:", e);
-  }
+  });
 }
 
 window.connectWallet = connectWallet;
@@ -621,7 +692,11 @@ async function syncChainState() {
  */
 async function getLedgerTimestamp() {
   const server = getRpcServer();
-  const ledger = await server.getLatestLedger();
+  const ledger = await withTimeout(
+    server.getLatestLedger(),
+    10000,
+    "Failed to fetch latest ledger. The RPC server might be slow or unresponsive."
+  );
   return Number(ledger.closeTime); // already seconds
 }
 
