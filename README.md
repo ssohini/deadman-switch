@@ -1,3 +1,11 @@
+# Deadman Switch 🚀
+
+[![CI](https://github.com/ssohini/deadman-switch/actions/workflows/main.yml/badge.svg)](https://github.com/ssohini/deadman-switch/actions)
+
+🚀 Automated CI/CD pipeline with GitHub Actions  
+✅ Smart contract + frontend tested on every commit  
+⚡ Build time ~1–2 minutes
+
 # 🛡️ Secure Switch Protocol (Soroban Deadman Switch)
 
 [![Stellar](https://img.shields.io/badge/Stellar-Soroban-black?style=flat&logo=stellar)](https://stellar.org)
