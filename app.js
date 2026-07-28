@@ -268,16 +268,21 @@ function decodeTransactionResult(resultXdr) {
  * Restores the original label + disabled state when the promise settles.
  */
 async function withButtonSpinner(btn, label, asyncFn) {
-  const originalText     = btn.textContent;
-  const originalDisabled = btn.disabled;
-  btn.disabled    = true;
+  const originalText = btn.textContent;
   btn.textContent = `⏳ ${label}…`;
   btn.classList.add("btn-loading");
+  
+  // Disable clicks using pointer-events to prevent double-clicks
+  // while keeping the button technically enabled in the DOM so
+  // browser extensions (like Freighter) can open popups within the user gesture context.
+  const originalPointerEvents = btn.style.pointerEvents;
+  btn.style.pointerEvents = "none";
+  
   try {
     return await asyncFn();
   } finally {
     btn.textContent = originalText;
-    btn.disabled    = originalDisabled;
+    btn.style.pointerEvents = originalPointerEvents;
     btn.classList.remove("btn-loading");
   }
 }
