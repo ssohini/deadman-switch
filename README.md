@@ -1,7 +1,6 @@
 # Deadman Switch 🚀
 
-[![CI](https://github.com/ssohini/deadman-switch/actions/workflows/main.yml/badge.svg)](https://github.com/ssohini/deadman-switch/actions)
-
+[![CI](https://github.com/ssohini/deadman-switch/actions/workflows/ci.yml/badge.svg)](https://github.com/ssohini/deadman-switch/actions)
 🚀 Automated CI/CD pipeline with GitHub Actions  
 ✅ Smart contract + frontend tested on every commit  
 ⚡ Build time ~1–2 minutes
