@@ -34,9 +34,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - name: Install Stellar CLI
-        run: cargo install --locked stellar-cli --version 21.0.0 --features opt
-
       - name: Build contract (WASM)
         working-directory: contract
         run: |
