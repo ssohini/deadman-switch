@@ -249,10 +249,9 @@ Every push or PR to `main` triggers the GitHub Actions workflow (`.github/workfl
 1. **Checkout** — Clones the repository
 2. **Rust Toolchain** — Installs stable Rust with `wasm32-unknown-unknown` target
 3. **Cache** — Caches `~/.cargo/registry` and build artifacts
-4. **Stellar CLI** — Installs `stellar-cli v21.0.0`
-5. **Build** — Compiles `deadman_switch.wasm`
-6. **Test** — Runs all `cargo test` unit tests
-7. **Artifact** — Uploads the WASM binary (7-day retention)
+4. **Build** — Compiles `deadman_switch.wasm` targeting `wasm32-unknown-unknown`
+5. **Test** — Runs all `cargo test` unit tests
+6. **Artifact** — Uploads the WASM binary (7-day retention)
 
 ---
 
