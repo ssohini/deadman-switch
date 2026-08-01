@@ -5,6 +5,14 @@
 ✅ Smart contract + frontend tested on every commit  
 ⚡ Build time ~1–2 minutes
 
+🚀 Project Demo
+
+🌐 Live Website
+👉 "Open App" (https://deadman-switch-stellar.netlify.app/)
+
+🎥 Demo Video
+""Watch the demo" (https://img.youtube.com/vi/TauFTt6bW5g/0.jpg)" (https://youtu.be/TauFTt6bW5g)
+
 # 🛡️ Secure Switch Protocol (Soroban Deadman Switch)
 
 [![Stellar](https://img.shields.io/badge/Stellar-Soroban-black?style=flat&logo=stellar)](https://stellar.org)
