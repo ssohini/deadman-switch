@@ -7,11 +7,14 @@
 
 🚀 Project Demo
 
-🌐 Live Website
-👉 "Open App" (https://deadman-switch-stellar.netlify.app/)
+## 🚀 Project Demo
 
-🎥 Demo Video
-""Watch the demo" (https://img.youtube.com/vi/TauFTt6bW5g/0.jpg)" (https://youtu.be/TauFTt6bW5g)
+🌐 **Live Website**
+👉 [Open App](https://deadman-switch-stellar.netlify.app/)
+
+🎥 **Demo Video**
+[![Watch the demo](https://img.youtube.com/vi/TauFTt6bW5g/hqdefault.jpg)](https://www.youtube.com/watch?v=TauFTt6bW5g)
+
 
 # 🛡️ Secure Switch Protocol (Soroban Deadman Switch)
 
