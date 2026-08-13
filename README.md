@@ -262,14 +262,19 @@ npm test
 
 ## 🔄 CI/CD Pipeline
 
-Every push or PR to `main` triggers the GitHub Actions workflow (`.github/workflows/ci.yml`):
+Every push or PR to `main` triggers the GitHub Actions workflow (`.github/workflows/ci.yml`) running two parallel jobs:
 
-1. **Checkout** — Clones the repository
-2. **Rust Toolchain** — Installs stable Rust with `wasm32-unknown-unknown` target
-3. **Cache** — Caches `~/.cargo/registry` and build artifacts
-4. **Build** — Compiles `deadman_switch.wasm` targeting `wasm32-unknown-unknown`
-5. **Test** — Runs all `cargo test` unit tests
-6. **Artifact** — Uploads the WASM binary (7-day retention)
+### 1. Frontend Test Job (`frontend-test`)
+- **Checkout & Node.js 20** — Prepares Node environment and caches `npm` packages
+- **Install Dependencies** — Runs `npm ci`
+- **Frontend Smoke Tests** — Runs `npm test` (verifies DOM structure, state persistence, loading helpers, and error decoding)
+
+### 2. Smart Contract Job (`contract-build-and-test`)
+- **Checkout & Rust Toolchain** — Installs stable Rust with `wasm32-unknown-unknown` target
+- **Cache** — Caches `~/.cargo/registry` and build artifacts
+- **Build** — Compiles `deadman_switch.wasm` targeting `wasm32-unknown-unknown`
+- **Test** — Runs all `cargo test` unit tests
+- **Artifact** — Uploads the WASM binary (7-day retention)
 
 ---
 
