@@ -1107,8 +1107,57 @@ clearLogsBtn.addEventListener("click", () => {
   consoleLogs.innerHTML = `<div class="log-line system">[LOGS CLEARED] State: ${state.status}</div>`;
 });
 
+// ─── UI Video & Interactions Setup ──────────────────────────────────────────────
+function initHlsDashboardVideo() {
+  const video = document.getElementById("dashboard-bg-video");
+  if (!video) return;
+  const src = "https://stream.mux.com/8wrHPCX2dC3msyYU9ObwqNdm00u3ViXvOSHUMRYSEe5Q.m3u8";
+
+  if (typeof Hls !== "undefined" && Hls.isSupported()) {
+    const hls = new Hls();
+    hls.loadSource(src);
+    hls.attachMedia(video);
+    hls.on(Hls.Events.MANIFEST_PARSED, function() {
+      video.play().catch(() => {});
+    });
+  } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+    video.src = src;
+    video.play().catch(() => {});
+  }
+}
+
+function initUIInteractions() {
+  const mobileBtn = document.getElementById("mobile-menu-btn");
+  const mobileDropdown = document.getElementById("mobile-nav-dropdown");
+  const openIcon = document.getElementById("menu-icon-open");
+  const closeIcon = document.getElementById("menu-icon-close");
+
+  if (mobileBtn && mobileDropdown) {
+    mobileBtn.addEventListener("click", () => {
+      const isHidden = mobileDropdown.classList.contains("hidden");
+      if (isHidden) {
+        mobileDropdown.classList.remove("hidden");
+        if (openIcon) openIcon.classList.add("hidden");
+        if (closeIcon) closeIcon.classList.remove("hidden");
+      } else {
+        mobileDropdown.classList.add("hidden");
+        if (openIcon) openIcon.classList.remove("hidden");
+        if (closeIcon) closeIcon.classList.add("hidden");
+      }
+    });
+  }
+
+  if (typeof lucide !== "undefined" && lucide.createIcons) {
+    lucide.createIcons();
+  }
+
+  initHlsDashboardVideo();
+}
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 function loadState() {
+  initUIInteractions();
+
   const stored = localStorage.getItem("deadman_switch_protocol");
   if (stored) {
     try {
